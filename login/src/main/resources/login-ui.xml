@@ -82,7 +82,7 @@
 
     <http name="invitationsSecurity"
           entry-point-ref="loginEntryPoint"
-          use-expressions="false"
+          use-expressions="true"
           pattern="/invitations/**"
           xmlns="http://www.springframework.org/schema/security">
         <access-denied-handler ref="loginEntryPoint"/>

@@ -1,5 +1,6 @@
 package org.cloudfoundry.identity.uaa.login;
 
+import org.cloudfoundry.identity.uaa.scim.endpoints.InvitationsEndpoint;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.*;
 import org.springframework.core.env.Environment;

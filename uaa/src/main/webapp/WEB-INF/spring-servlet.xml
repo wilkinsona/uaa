@@ -280,7 +280,6 @@
         <property name="autoAddAuthorities" ref="autoAddAuthorities"/>
     </bean>
 
-
     <beans profile="ldap">
         <import resource="classpath:ldap-integration.xml"/>
 

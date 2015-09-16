@@ -220,6 +220,19 @@
         <csrf disabled="true"/>
     </http>
 
+    <bean id="invitationsEndpoint" class="org.cloudfoundry.identity.uaa.scim.endpoints.InvitationsEndpoint">
+    </bean>
+
+    <http  name="inviteUsers" pattern="/invite_users*" create-session="stateless" authentication-manager-ref="emptyAuthenticationManager"
+           entry-point-ref="oauthAuthenticationEntryPoint"
+           xmlns="http://www.springframework.org/schema/security" use-expressions="true">
+        <intercept-url pattern="/**" access="#oauth2.hasAnyScope('scim.invite')" method="POST" />
+        <expression-handler ref="oauthWebExpressionHandler" />
+        <custom-filter ref="resourceAgnosticAuthenticationFilter" position="PRE_AUTH_FILTER" />
+        <access-denied-handler ref="oauthAccessDeniedHandler" />
+        <csrf disabled="true"/>
+    </http>
+
     <oauth:resource-server id="passwordResourceAuthenticationFilter" token-services-ref="tokenServices"
         resource-id="password" entry-point-ref="oauthAuthenticationEntryPoint" />
 

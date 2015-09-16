@@ -14,6 +14,7 @@
 
 package org.cloudfoundry.identity.uaa.login;
 
+import junit.framework.Assert;
 import org.cloudfoundry.identity.uaa.AbstractIdentityProviderDefinition;
 import org.cloudfoundry.identity.uaa.authentication.Origin;
 import org.cloudfoundry.identity.uaa.authentication.UaaAuthentication;
@@ -28,6 +29,8 @@ import org.cloudfoundry.identity.uaa.mock.InjectedMockContextTest;
 import org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils;
 import org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.IdentityZoneCreationResult;
 import org.cloudfoundry.identity.uaa.scim.ScimUser;
+import org.cloudfoundry.identity.uaa.test.TestClient;
+import org.cloudfoundry.identity.uaa.test.UaaTestAccounts;
 import org.cloudfoundry.identity.uaa.user.UaaUserDatabase;
 import org.cloudfoundry.identity.uaa.util.JsonUtils;
 import org.cloudfoundry.identity.uaa.zone.IdentityProvider;
@@ -47,6 +50,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.common.util.RandomValueStringGenerator;
+import org.springframework.security.oauth2.provider.client.BaseClientDetails;
 import org.springframework.security.providers.ExpiringUsernameAuthenticationToken;
 import org.springframework.security.saml.SAMLAuthenticationToken;
 import org.springframework.security.saml.SAMLConstants;
@@ -57,12 +61,14 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.util.StringUtils;
 
+import javax.validation.constraints.AssertTrue;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static junit.framework.Assert.assertTrue;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
@@ -71,6 +77,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.http.MediaType.TEXT_PLAIN;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -85,6 +93,18 @@ public class InvitationsServiceMockMvcTests extends InjectedMockContextTest {
     private FakeJavaMailSender fakeJavaMailSender = new FakeJavaMailSender();
     private RandomValueStringGenerator generator = new RandomValueStringGenerator();
     private MockMvcUtils utils = MockMvcUtils.utils();
+    private String adminToken;
+    private TestClient testClient;
+
+    @Before
+    public void setUp() throws Exception {
+        UaaTestAccounts testAccounts = UaaTestAccounts.standard(null);
+        testClient = new TestClient(getMockMvc());
+        adminToken = testClient.getClientCredentialsOAuthAccessToken(
+                testAccounts.getAdminClientId(),
+                testAccounts.getAdminClientSecret(),
+                "clients.admin clients.read clients.write clients.secret scim.read scim.write");
+    }
 
     @Before
     public void setUpFakeMailServer() throws Exception {
@@ -147,6 +167,49 @@ public class InvitationsServiceMockMvcTests extends InjectedMockContextTest {
         assertEquals(Origin.UAA, getWebApplicationContext().getBean(JdbcTemplate.class).queryForObject("select origin from users where username=?", new Object[]{email}, String.class));
     }
 
+    @Test
+    public void invite_users_with_client_id_And_Matching_Redirect_Uri_Returns_201() throws Exception {
+
+        String clientId = new RandomValueStringGenerator().generate();
+        BaseClientDetails client = new BaseClientDetails(clientId, "", "", "client_credentials", "scim.invite,openid");
+        client.setClientSecret("secret");
+        client.setRegisteredRedirectUri(Collections.singleton("some_uri"));
+        utils.createClient(getMockMvc(), adminToken, client);
+
+        String token = utils.getClientCredentialsOAuthAccessToken(getMockMvc(), client.getClientId(),
+                client.getClientSecret(), "scim.invite,openid", "");
+
+        MvcResult result = getMockMvc().perform(post("/invite_users").param("client_id", clientId)
+                .param("redirect_uri", "some_uri")
+                .contentType(TEXT_PLAIN)
+                .header("Authorization", "Bearer " + token)
+                .content("[user1@example.com,user2@example.com]"))
+                .andExpect(status().isCreated()).andReturn();
+
+        Map<String, Object> response = JsonUtils.readValue(result.getResponse().getContentAsString(), Map.class);
+        List<String> emails = (List<String>) response.get("users");
+
+        assertTrue(emails.contains("user1@example.com"));
+        assertTrue(emails.contains("user2@example.com"));
+
+    }
+
+    @Test
+    public void invite_users_without_client_id_returns_400() throws Exception {
+        String clientId = new RandomValueStringGenerator().generate();
+
+        BaseClientDetails client = new BaseClientDetails(clientId, "", "", "client_credentials", "scim.invite,openid");
+        client.setClientSecret("secret");
+        utils.createClient(getMockMvc(), adminToken, client);
+
+        String token = utils.getClientCredentialsOAuthAccessToken(getMockMvc(), client.getClientId(),
+                client.getClientSecret(), "scim.invite,openid", "");
+
+        getMockMvc().perform(post("/invite_users")
+                .param("redirect_uri", "some_uri")
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest());
+    }
 
     @Test
     public void invite_user_show_correct_saml_and_uaa_idp_for_acceptance() throws Exception {
