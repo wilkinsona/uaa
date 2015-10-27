@@ -12,21 +12,13 @@
  *******************************************************************************/
 package org.cloudfoundry.identity.uaa.login;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStreamReader;
-import java.security.KeyPair;
-import java.security.KeyStore;
-import java.security.Security;
-import java.security.cert.Certificate;
-import java.security.cert.X509Certificate;
-import java.util.Collections;
-import java.util.Set;
-
-import javax.net.ssl.KeyManagerFactory;
-
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.openssl.PEMReader;
-import org.bouncycastle.openssl.PasswordFinder;
+import org.bouncycastle.openssl.PEMDecryptorProvider;
+import org.bouncycastle.openssl.PEMEncryptedKeyPair;
+import org.bouncycastle.openssl.PEMKeyPair;
+import org.bouncycastle.openssl.PEMParser;
+import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
+import org.bouncycastle.openssl.jcajce.JcePEMDecryptorProviderBuilder;
 import org.opensaml.xml.security.CriteriaSet;
 import org.opensaml.xml.security.SecurityException;
 import org.opensaml.xml.security.credential.Credential;
@@ -34,6 +26,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.saml.key.JKSKeyManager;
 import org.springframework.security.saml.key.KeyManager;
+
+import javax.net.ssl.KeyManagerFactory;
+import java.io.ByteArrayInputStream;
+import java.io.StringReader;
+import java.security.KeyPair;
+import java.security.KeyStore;
+import java.security.Security;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
+import java.util.Collections;
+import java.util.Set;
 
 public class SamlLoginServerKeyManager implements KeyManager {
 
@@ -48,12 +52,19 @@ public class SamlLoginServerKeyManager implements KeyManager {
         }
 
         try {
-            PEMReader reader = new PEMReader(new InputStreamReader(new ByteArrayInputStream(certificate.getBytes())));
-            X509Certificate cert = (X509Certificate) reader.readObject();
+            CertificateFactory factory = CertificateFactory.getInstance("X.509");
+            X509Certificate cert = (X509Certificate)factory.generateCertificate(new ByteArrayInputStream(certificate.getBytes()));
 
-            reader = new PEMReader(new InputStreamReader(new ByteArrayInputStream(key.getBytes())),
-                            new StringPasswordFinder(password));
-            KeyPair pkey = (KeyPair) reader.readObject();
+            PEMParser pemParser = new PEMParser(new StringReader(key));
+            Object object = pemParser.readObject();
+            PEMDecryptorProvider decProv = new JcePEMDecryptorProviderBuilder().build(password.toCharArray());
+            JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
+            KeyPair pkey = null;
+            if (object instanceof PEMEncryptedKeyPair) {
+                pkey = converter.getKeyPair(((PEMEncryptedKeyPair) object).decryptKeyPair(decProv));
+            } else {
+                pkey = converter.getKeyPair((PEMKeyPair) object);
+            }
 
             KeyStore keystore = KeyStore.getInstance("JKS");
             keystore.load(null);
@@ -79,21 +90,6 @@ public class SamlLoginServerKeyManager implements KeyManager {
                             "Could not load service provider certificate. Check serviceProviderKey and certificate parameters",
                             t);
         }
-    }
-
-    private class StringPasswordFinder implements PasswordFinder {
-
-        private String password = null;
-
-        public StringPasswordFinder(String password) {
-            this.password = password;
-        }
-
-        @Override
-        public char[] getPassword() {
-            return password.toCharArray();
-        }
-
     }
 
     @Override

@@ -7,7 +7,7 @@ ext {
   postgresqlVersion = '9.1-901.jdbc3'
   tomcatVersion = '7.0.61'
   springSecurityJwtVersion = '1.0.3.RELEASE'
-  bcpkixVersion  = '1.47'
+  bcpkixVersion  = '1.53'
   apacheLdapApiVersion = '1.0.0-M22'
   jacksonVersion = '2.5.3'
   flywayVersion = '3.2.1'
