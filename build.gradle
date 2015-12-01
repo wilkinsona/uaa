@@ -261,9 +261,10 @@ Project identityLogin = subprojects.find { it.name.equals('cloudfoundry-identity
 Project identityUaa = subprojects.find { it.name.equals('cloudfoundry-identity-uaa') }
 
 def publishedProjects = subprojects
+def integrationProjects = project.getTasksByName("integrationTest", true).collect { it.getProject() }
 
 task jacocoRootReport(type: org.gradle.testing.jacoco.tasks.JacocoReport) {
-  dependsOn = subprojects.test
+  dependsOn = [ subprojects.test, integrationProjects.integrationTest ]
   additionalSourceDirs = files(subprojects.sourceSets.main.allSource.srcDirs)
   sourceDirectories = files(subprojects.sourceSets.main.allSource.srcDirs)
   classDirectories = files(subprojects.sourceSets.main.output)
@@ -291,8 +292,6 @@ coveralls {
 tasks.coveralls {
   group = 'Coverage reports'
   description = 'Uploads the aggregated coverage report to Coveralls'
-
-  dependsOn jacocoRootReport
 }
 
 assemble.dependsOn subprojects.assemble
