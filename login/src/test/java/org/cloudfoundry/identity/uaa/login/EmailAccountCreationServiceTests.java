@@ -96,7 +96,7 @@ public class EmailAccountCreationServiceTests {
     private EmailAccountCreationService initEmailAccountCreationService(String brand) {
         return new EmailAccountCreationService(templateEngine, messageService, codeStore,
             scimUserProvisioning, clientDetailsService, passwordValidator, new UaaUrlUtils(),
-            brand);
+            brand, "/create_account");
     }
 
     @After

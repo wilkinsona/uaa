@@ -14,6 +14,8 @@ public interface AccountCreationService {
 
     String getDefaultRedirect() throws IOException;
 
+    String getSignupUrl();
+
     class ExistingUserResponse {
         @JsonProperty
         private String error;

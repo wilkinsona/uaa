@@ -251,6 +251,30 @@ public class AccountsControllerMockMvcTests extends InjectedMockContextTest {
     }
 
     @Test
+    public void testVerifyUserWithInvalidCode() throws Exception {
+        PredictableGenerator generator = new PredictableGenerator();
+        JdbcExpiringCodeStore store = getWebApplicationContext().getBean(JdbcExpiringCodeStore.class);
+        store.setGenerator(generator);
+
+        getMockMvc().perform(post("/create_account.do")
+            .param("email", userEmail)
+            .param("password", "secr3T")
+            .param("password_confirmation", "secr3T"))
+            .andExpect(status().isFound())
+            .andExpect(redirectedUrl("accounts/email_sent"));
+
+        String code = "test" + generator.counter.get();
+
+        // Expires the code
+        store.retrieveCode(code);
+
+        getMockMvc().perform(get("/verify_user")
+            .param("code", code))
+            .andExpect(redirectedUrl("/create_account"))
+            .andReturn();
+    }
+
+    @Test
     public void testCreatingAnAccountWithAnEmptyClientId() throws Exception {
         PredictableGenerator generator = new PredictableGenerator();
         JdbcExpiringCodeStore store = getWebApplicationContext().getBean(JdbcExpiringCodeStore.class);

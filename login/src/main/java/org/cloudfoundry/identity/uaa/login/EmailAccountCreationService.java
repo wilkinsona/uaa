@@ -45,16 +45,17 @@ public class EmailAccountCreationService implements AccountCreationService {
     private final ClientDetailsService clientDetailsService;
     private final PasswordValidator passwordValidator;
     private final String brand;
+    private final String signupUrl;
 
     public EmailAccountCreationService(
-            SpringTemplateEngine templateEngine,
-            MessageService messageService,
-            ExpiringCodeStore codeStore,
-            ScimUserProvisioning scimUserProvisioning,
-            ClientDetailsService clientDetailsService,
-            PasswordValidator passwordValidator,
-            UaaUrlUtils uaaUrlUtils,
-            String brand) {
+        SpringTemplateEngine templateEngine,
+        MessageService messageService,
+        ExpiringCodeStore codeStore,
+        ScimUserProvisioning scimUserProvisioning,
+        ClientDetailsService clientDetailsService,
+        PasswordValidator passwordValidator,
+        UaaUrlUtils uaaUrlUtils,
+        String brand, String signupUrl) {
 
         this.templateEngine = templateEngine;
         this.messageService = messageService;
@@ -63,6 +64,7 @@ public class EmailAccountCreationService implements AccountCreationService {
         this.clientDetailsService = clientDetailsService;
         this.passwordValidator = passwordValidator;
         this.brand = brand;
+        this.signupUrl = signupUrl;
     }
 
     @Override
@@ -104,7 +106,6 @@ public class EmailAccountCreationService implements AccountCreationService {
 
         ExpiringCode expiringCode = codeStore.retrieveCode(code);
         if (expiringCode==null) {
-            //just to satisfy unit tests
             throw new HttpClientErrorException(HttpStatus.BAD_REQUEST);
         }
 
@@ -135,6 +136,11 @@ public class EmailAccountCreationService implements AccountCreationService {
     @Override
     public String getDefaultRedirect() throws IOException {
         return "home";
+    }
+
+    @Override
+    public String getSignupUrl() {
+        return signupUrl;
     }
 
     @Override

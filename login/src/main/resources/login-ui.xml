@@ -543,6 +543,7 @@
         <constructor-arg ref="uaaPasswordValidator"/>
         <constructor-arg ref="uaaUrlUtils" />
         <constructor-arg value="${login.brand:oss}"/>
+        <constructor-arg value="${links.signup:/create_account}" />
     </bean>
 
     <bean id="uaaPasswordValidator" class="org.cloudfoundry.identity.uaa.scim.validate.UaaPasswordPolicyValidator">
