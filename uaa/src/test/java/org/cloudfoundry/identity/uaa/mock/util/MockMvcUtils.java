@@ -453,6 +453,7 @@ public class MockMvcUtils {
         String requestDomain = subdomain.equals("") ? "localhost" : subdomain + ".localhost";
         MvcResult userResult = mockMvc.perform(post("/Users")
                 .header("Authorization", "Bearer " + accessToken)
+//                .header(IdentityZoneSwitchingFilter.SUBDOMAIN_HEADER, subdomain)
                 .with(new SetServerNameRequestPostProcessor(requestDomain))
                 .contentType(APPLICATION_JSON)
                 .content(JsonUtils.writeValueAsBytes(user)))

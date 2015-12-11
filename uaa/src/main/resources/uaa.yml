@@ -2,7 +2,7 @@
 # if any of these exist:
 # [$UAA_CONFIG_URL, $UAA_CONFIG_PATH/uaa.yml, $CLOUD_FOUNDRY_CONFIG_PATH/uaa.yml]
 
-#spring_profiles: mysql,default
+spring_profiles: ldap,mysql,default
 #spring_profiles: postgresql,default
 #spring_profiles: ldap,default,hsqldb
 #spring_profiles: saml
@@ -70,7 +70,20 @@
 #    url: http://localhost:35357/v2.0/tokens
 #    url: http://localhost:5000/v3/auth/tokens
 
-#ldap:
+ldap:
+  ldapdebug: 'Ldap configured through UAA'
+  profile:
+    file: ldap/ldap-search-and-bind.xml
+  base:
+    url: 'ldap://52.20.5.106:389/'
+    userDn: 'cn=admin,dc=test,dc=com'
+    password: 'password'
+    searchBase: 'dc=test,dc=com'
+    searchFilter: 'cn={0}'
+    mailAttributeName: 'mail'
+    mailSubstitute: ''
+    mailSubstituteOverridesLdap: false
+
 #  profile:
 #    file: ldap/ldap-simple-bind.xml
 #  base:

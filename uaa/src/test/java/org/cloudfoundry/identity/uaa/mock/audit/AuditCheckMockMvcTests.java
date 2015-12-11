@@ -51,11 +51,13 @@ import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
 import org.cloudfoundry.identity.uaa.zone.MultitenantJdbcClientDetailsService;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.common.util.RandomValueStringGenerator;
 import org.springframework.security.oauth2.provider.ClientDetails;
@@ -66,12 +68,16 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
 import static org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.CookieCsrfPostProcessor.cookieCsrf;
+import static org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.utils;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.atLeast;
@@ -274,6 +280,59 @@ public class AuditCheckMockMvcTests extends InjectedMockContextTest {
         PrincipalAuthenticationFailureEvent event2 = (PrincipalAuthenticationFailureEvent)captor.getAllValues().get(1);
         assertEquals(testUser.getUserName(), event1.getUser().getUsername());
         assertEquals(testUser.getUserName(), event2.getName());
+    }
+
+    @Ignore
+    @Test
+    public void invalidPasswordLoginEndpointTest() throws Exception {
+
+        try {
+            // given a zone
+            RandomValueStringGenerator generator = new RandomValueStringGenerator();
+            String subdomain = new RandomValueStringGenerator(8).generate();
+            BaseClientDetails bootstrapClient = null;
+            MockMvcUtils.IdentityZoneCreationResult result = utils().createOtherIdentityZoneAndReturnResult(
+                    subdomain, getMockMvc(), getWebApplicationContext(), bootstrapClient
+            );
+
+            // and given a user in that zone
+            String username = generator.generate() + "-user";
+            ScimUser user = new ScimUser(null, username, "given-name", "family-name");
+            user.setPrimaryEmail(username);
+            user.setPassword("password");
+            utils().createUserInZone(this.getMockMvc(), result.getZoneAdminToken(), user, subdomain);
+
+            // and given that we have a newly initialized uaa event listener
+            listener = mock(new DefaultApplicationListener<AbstractUaaEvent>() {
+            }.getClass());
+            getWebApplicationContext().addApplicationListener(listener);
+
+            // when that user tries to login (to that zone) with an incorrect password
+            MockHttpServletRequestBuilder loginPost = post("/login.do")
+                    .header("Host", result.getIdentityZone().getSubdomain() + ".localhost")
+                    .with(cookieCsrf())
+                    .accept("text/html")
+                    .param("username", user.getUserName())
+                    .param("password", "adasda");
+            getMockMvc().perform(loginPost)
+
+                    // expect a 302 to the login error page
+                    .andExpect(status().is3xxRedirection());
+            //            .andExpect(content().string("{\"error\":\"authentication failed\"}"));
+
+            ArgumentCaptor<AbstractUaaEvent> captor = ArgumentCaptor.forClass(AbstractUaaEvent.class);
+            verify(listener, atLeast(2)).onApplicationEvent(captor.capture());
+
+            UserAuthenticationFailureEvent event1 = (UserAuthenticationFailureEvent) captor.getAllValues().get(0);
+            PrincipalAuthenticationFailureEvent event2 = (PrincipalAuthenticationFailureEvent) captor.getAllValues().get(1);
+            assertEquals(user.getUserName(), event1.getUser().getUsername());
+            assertEquals(user.getUserName(), event2.getName());
+
+            JdbcTemplate template = getWebApplicationContext().getBean(JdbcTemplate.class);
+//            assertThat(template.queryForObject("select count(*) from sec_audit where identity_zone_id=?", Integer.class, result.getIdentityZone().getId()), greaterThan(1));
+        } finally {
+            MockMvcUtils.utils().removeEventListener(getWebApplicationContext(), listener);
+        }
     }
 
     @Test
